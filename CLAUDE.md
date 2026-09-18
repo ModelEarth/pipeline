@@ -26,7 +26,7 @@ No test project exists.
 
 **ASP.NET Core MVC on .NET 10** — a multi-provider database web console: connection profile manager, schema browser, ad-hoc SQL editor, stored-procedure runner, CSV/TSV bulk importer, saved-query library, query audit log, and a GitHub-hosted script runner ("Pipelines"). Users can register personal DB connections (SQL Server or PostgreSQL) or use profiles marked shared.
 
-**App's own store:** SQL Server via EF Core (`ApplicationDbContext` extends `IdentityDbContext`).
+**App's own store:** SQL Server via EF Core (`ApplicationDbContext` extends `IdentityDbContext`; design-time migrations use `ApplicationDbContextFactory` so `dotnet ef` never runs the app's real startup code against the live database).
 **Target databases** users connect to: SQL Server (`Microsoft.Data.SqlClient`) or PostgreSQL (`Npgsql`), abstracted behind provider factories.
 
 ### Request paths
@@ -58,13 +58,14 @@ Configuration resolves in this order at startup (see `Program.cs`):
 
 1. **Bootstrap phase:** environment variables + user secrets are read to find `GITHUB_CONFIG_TOKEN`.
 2. If the token is set, the app fetches `.env` from `raw.githubusercontent.com/garmartirosy/netdev/main/.env` and loads it into the environment via `DotNetEnv`.
-3. If not set, `DotNetEnv.Env.TraversePath().Load()` loads a local `.env`.
-4. Standard `WebApplication.CreateBuilder(args)` then reads `appsettings.json`, environment, and user secrets normally.
+3. If not set, the app looks for a repo folder near this checkout whose name starts with `cloud` and that has an `automation/paths.yaml` file; if found, it loads whatever env file that file points to. This is local-only — it does nothing (and logs nothing about it) when no such repo is present, e.g. in Docker or CI.
+4. If that also finds nothing, `DotNetEnv.Env.TraversePath().Load()` loads a local `.env`.
+5. Standard `WebApplication.CreateBuilder(args)` then reads `appsettings.json`, environment, and user secrets normally.
 
 **Required keys** (env, secrets, or `.env`):
-- `ConnectionStrings:DefaultConnection` — SQL Server for the app's own store (Identity + profiles + audit). `appsettings.json` ships with an empty string.
-- `Authentication:Google:ClientId` / `ClientSecret` — startup throws without these.
-- `POSTGRES_HOST`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT` (default 5432) — used by `SeedDefaultConnectionsAsync` to seed the "IndustryDB (Azure PostgreSQL)" shared profile (fixed GUID `0000...0001`). Seeder runs `db.Database.MigrateAsync()` on every startup and upserts the profile.
+- `ConnectionStrings:DefaultConnection` — SQL Server (Azure SQL) for the app's own store (Identity + profiles + audit), a database named `DBMonitor`. `appsettings.json` ships with an empty string; if unset, it's built from `DBMONITOR_HOST`, `DBMONITOR_USER`, `DBMONITOR_PASSWORD` (`DBMONITOR_PORT` default 1433, `DBMONITOR_NAME` default `DBMonitor`) — startup throws if `DBMONITOR_HOST` is also unset.
+- `Authentication:Google:ClientId` / `ClientSecret` — startup throws without these. Falls back to flat `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` if the hierarchical keys aren't set.
+- `EXIOBASE_HOST`, `EXIOBASE_NAME`, `EXIOBASE_USER`, `EXIOBASE_PASSWORD`, `EXIOBASE_PORT` (default 5432), `EXIOBASE_SSL_MODE` (default `Require`) — a separate Azure Postgres server/account. Used by `SeedDefaultConnectionsAsync` to seed the "IndustryDB (Azure PostgreSQL)" shared profile (fixed GUID `0000...0001`). Seeder runs `db.Database.MigrateAsync()` on every startup and upserts the profile.
 
 **Other:** User Secrets ID `aspnet-DBMonitor-6ee26c51-a0a3-4b84-a74c-9cac22db2c6e`. Uploads capped at 100 MB (Kestrel + `FormOptions`). Identity is configured with `RequireConfirmedAccount = false`.
 
