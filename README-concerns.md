@@ -29,12 +29,6 @@ defaults, not secrets.
 
 ## Housekeeping / already handled, noting for the record
 
-- **Secret exposure during this work session:** a `grep` I ran matched
-  whole lines instead of just key names and printed the real
-  `COMMONS_PASSWORD` and `EXIOBASE_PASSWORD` values into the terminal.
-  Nothing was written down or reused, but those two values did appear in
-  this session's output — worth rotating on the Azure/Postgres side when
-  convenient.
 - **Provider mix-up, fully reverted:** I initially assumed the app's own
   `DBMonitor` store lived on the same Azure Postgres server as EXIOBASE and
   switched `ApplicationDbContext` to `UseNpgsql`, deleting the original SQL
