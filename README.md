@@ -1,5 +1,10 @@
 # Pipeline
 
+## Getting Started
+
+Setting up or managing Azure resources (SQL/PostgreSQL databases, schema deployment)? Start at
+**[pipeline/azure](azure/)** for the automation script and its config.
+
 .NET 10 database console (`DBMonitor/`) — see [CLAUDE.md](CLAUDE.md) for architecture and setup.
 Used, among other things, to browse and query the Exiobase Industry Database instances described
 in [exiobase/tradeflow](https://github.com/ModelEarth/exiobase/tree/main/tradeflow) and
@@ -27,7 +32,7 @@ Postgres login can grant itself. `SHOW azure.extensions` on this server currentl
 Whoever has Azure access for `modelearth-postgres-server` needs to:
 
 1. **Confirm which Azure Postgres offering this server is** — the exact `az` command group
-   differs between them. `profile/azure/azure.sh` (in the `webroot` repo) calls
+   differs between them. [`azure/azure.sh`](azure/) (in this repo) calls
    `az postgres server ...` (not `az postgres flexible-server ...`), which points at the older
    **Single Server** SKU, but confirm directly rather than trust that:
    ```bash

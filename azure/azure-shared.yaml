@@ -1,0 +1,20 @@
+# Shared (non-secret) Azure resource settings for the team.
+# Checked into GitHub -- do not put admin credentials or subscription ids
+# here. Those live in the team's shared .env file outside webroot, resolved
+# through ../../automation/paths.yaml (see pipeline/README.md's Getting
+# Started section, or run azure.sh, which will explain what's missing).
+database_type: sql
+resource_group: ""
+location: eastus
+sql_server_name: ""
+sql_server_location: eastus
+postgresql_server_name: ""
+postgresql_server_location: eastus
+postgresql_server_sku_name: B_Gen5_1
+postgresql_server_storage_mb: 5120
+postgresql_server_version: "11"
+database_name: ""
+database_service_tier: Basic
+database_compute_size: Basic
+suitecrm_schema_url: https://raw.githubusercontent.com/ModelEarth/profile/refs/heads/main/crm/sql/crm-postgres.sql
+suitecrm_schema_auto_apply: false

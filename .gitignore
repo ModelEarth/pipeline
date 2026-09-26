@@ -17,6 +17,12 @@ out/
 secrets.json
 *.pfx
 
+## Azure automation script config (azure/) -- contains resource/credential
+## settings; carried over from profile/.gitignore when azure/ moved here
+azure/azure-db-config.template.json
+azure/azure-db-config.json
+azure/azure-db-config.json.bak
+
 ## Python
 __pycache__/
 *.py[cod]
