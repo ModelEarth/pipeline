@@ -31,9 +31,106 @@ if (!string.IsNullOrWhiteSpace(githubToken))
 
     DotNetEnv.Env.LoadContents(envContent);
 }
-else
+else if (!TryLoadLocalCloudRepoSecrets())
 {
     DotNetEnv.Env.TraversePath().Load();
+}
+
+// No GITHUB_CONFIG_TOKEN set: this is a local run. Looks for a repo folder
+// near this checkout whose name starts with "cloud" and that has an
+// automation/paths.yaml file — the same file that repo's own
+// automation/sync-config.sh reads to find its env file — and, if found,
+// loads whatever env file it points to. Never logs the resolved path or
+// its contents. Silently does nothing if no such repo/file is present
+// (e.g. in Docker or CI), so DotNetEnv.Env.TraversePath().Load() still
+// runs as the fallback in that case.
+static bool TryLoadLocalCloudRepoSecrets()
+{
+    var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+
+    for (var depth = 0; depth < 4 && dir?.Parent is not null; depth++)
+    {
+        var parent = dir.Parent;
+
+        IEnumerable<DirectoryInfo> siblings;
+        try
+        {
+            siblings = parent.GetDirectories();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            break;
+        }
+
+        foreach (var sibling in siblings)
+        {
+            if (sibling.FullName == dir.FullName) continue;
+            if (!sibling.Name.StartsWith("cloud", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var pathsYaml = Path.Combine(sibling.FullName, "automation", "paths.yaml");
+            if (!File.Exists(pathsYaml)) continue;
+
+            var envFile = ResolveEnvFileFromPathsYaml(pathsYaml);
+            if (envFile is not null && File.Exists(envFile))
+            {
+                DotNetEnv.Env.Load(envFile);
+                return true;
+            }
+        }
+
+        dir = parent;
+    }
+
+    return false;
+}
+
+static string? ResolveEnvFileFromPathsYaml(string pathsYamlPath)
+{
+    var envFileLine = File.ReadLines(pathsYamlPath)
+        .Select(line => line.Trim())
+        .Where(line => line.StartsWith("env_file:", StringComparison.OrdinalIgnoreCase))
+        .LastOrDefault();
+
+    if (envFileLine is null) return null;
+
+    var value = envFileLine["env_file:".Length..].Trim().Trim('"');
+    if (value.Length == 0) return null;
+
+    return Path.GetFullPath(Path.Combine(Path.GetDirectoryName(pathsYamlPath)!, value));
+}
+
+// Builds the connection string for the EXIOBASE industry database, an
+// Azure Postgres server/account separate from the app's own SQL Server
+// store.
+static string BuildExiobaseConnectionString(IConfiguration configuration) =>
+    $"Host={configuration["EXIOBASE_HOST"]};" +
+    $"Database={configuration["EXIOBASE_NAME"]};" +
+    $"Username={configuration["EXIOBASE_USER"]};" +
+    $"Password={configuration["EXIOBASE_PASSWORD"]};" +
+    $"Port={configuration["EXIOBASE_PORT"] ?? "5432"};" +
+    $"SSL Mode={configuration["EXIOBASE_SSL_MODE"] ?? "Require"};" +
+    "Trust Server Certificate=true";
+
+// Builds the connection string for the app's own Azure SQL "DBMonitor"
+// store from DBMONITOR_HOST/USER/PASSWORD, so individual developers don't
+// need a full ConnectionStrings:DefaultConnection entry — just those three
+// values from whoever manages the Azure SQL server.
+static string BuildDbMonitorConnectionString(IConfiguration configuration)
+{
+    var host = configuration["DBMONITOR_HOST"];
+    if (string.IsNullOrWhiteSpace(host))
+    {
+        throw new InvalidOperationException(
+            "Connection string 'DefaultConnection' was not found.");
+    }
+
+    return
+        $"Server={host},{configuration["DBMONITOR_PORT"] ?? "1433"};" +
+        $"Database={configuration["DBMONITOR_NAME"] ?? "DBMonitor"};" +
+        $"User Id={configuration["DBMONITOR_USER"]};" +
+        $"Password={configuration["DBMONITOR_PASSWORD"]};" +
+        "Encrypt=True;" +
+        "TrustServerCertificate=False;";
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -41,9 +138,10 @@ var builder = WebApplication.CreateBuilder(args);
 // ── Data ──────────────────────────────────────────────────────────────────────
 
 var connectionString =
-    builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException(
-        "Connection string 'DefaultConnection' was not found.");
+    builder.Configuration.GetConnectionString("DefaultConnection") is
+        { Length: > 0 } explicitConnectionString
+        ? explicitConnectionString
+        : BuildDbMonitorConnectionString(builder.Configuration);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
@@ -66,11 +164,13 @@ builder.Services
     {
         options.ClientId =
             builder.Configuration["Authentication:Google:ClientId"]
+            ?? builder.Configuration["GOOGLE_CLIENT_ID"]
             ?? throw new InvalidOperationException(
                 "Google Client ID is missing.");
 
         options.ClientSecret =
             builder.Configuration["Authentication:Google:ClientSecret"]
+            ?? builder.Configuration["GOOGLE_CLIENT_SECRET"]
             ?? throw new InvalidOperationException(
                 "Google Client Secret is missing.");
     });
@@ -215,14 +315,7 @@ static async Task SeedDefaultConnectionsAsync(WebApplication app)
 
             Provider = DbProviderKind.PostgreSql,
 
-            PlaintextConnStr =
-                $"Host={app.Configuration["POSTGRES_HOST"]};" +
-                $"Database={app.Configuration["POSTGRES_DB"]};" +
-                $"Username={app.Configuration["POSTGRES_USER"]};" +
-                $"Password={app.Configuration["POSTGRES_PASSWORD"]};" +
-                $"Port={app.Configuration["POSTGRES_PORT"] ?? "5432"};" +
-                "SSL Mode=Require;" +
-                "Trust Server Certificate=true"
+            PlaintextConnStr = BuildExiobaseConnectionString(app.Configuration)
         }
     };
 
