@@ -39,7 +39,7 @@ else if (!TryLoadLocalCloudRepoSecrets())
 // No GITHUB_CONFIG_TOKEN set: this is a local run. Looks for a repo folder
 // near this checkout whose name starts with "cloud" and that has an
 // automation/paths.yaml file — the same file that repo's own
-// automation/sync-config.sh reads to find its env file — and, if found,
+// automation/sync-config.sh reads to find its env file — and, if found
 // loads whatever env file it points to. Never logs the resolved path or
 // its contents. Silently does nothing if no such repo/file is present
 // (e.g. in Docker or CI), so DotNetEnv.Env.TraversePath().Load() still
