@@ -54,40 +54,8 @@ public class AdminController : Controller
         return RedirectToAction(nameof(Users));
     }
 
-    // ── Toggle Admin ──────────────────────────────────────────────────────────
-
-    [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> ToggleAdmin(string id)
-    {
-        var user = await _userManager.FindByIdAsync(id);
-        if (user is null) return NotFound();
-
-        var currentUserId = _userManager.GetUserId(User)!;
-
-        if (await _userManager.IsInRoleAsync(user, Roles.Admin))
-        {
-            // Don't let the last admin demote themselves and lock everyone out.
-            if (user.Id == currentUserId)
-            {
-                var adminCount = (await _userManager.GetUsersInRoleAsync(Roles.Admin)).Count;
-                if (adminCount <= 1)
-                {
-                    TempData["AdminError"] =
-                        "You are the last admin — promote someone else before demoting yourself.";
-                    return RedirectToAction(nameof(Users));
-                }
-            }
-            await _userManager.RemoveFromRoleAsync(user, Roles.Admin);
-        }
-        else
-        {
-            await _userManager.AddToRoleAsync(user, Roles.Admin);
-            // Admins implicitly see shared DBs — grant it alongside so the UI
-            // reflects their effective access.
-            if (!await _userManager.IsInRoleAsync(user, Roles.IndustryDbAccess))
-                await _userManager.AddToRoleAsync(user, Roles.IndustryDbAccess);
-        }
-
-        return RedirectToAction(nameof(Users));
-    }
+    // Promoting/demoting admins is intentionally not exposed in the UI —
+    // admins are seeded exclusively from the ADMIN_EMAILS env var at startup
+    // (see SeedRolesAndAdminsAsync in Program.cs). This keeps privilege
+    // escalation out of the running app surface.
 }
