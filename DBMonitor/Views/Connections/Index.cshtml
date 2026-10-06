@@ -48,13 +48,19 @@ else
                     <td><span class="badge bg-secondary">@p.Provider</span></td>
                     <td class="text-muted small">@p.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</td>
                     <td class="text-muted small">@(p.LastUsedUtc.HasValue ? p.LastUsedUtc.Value.ToString("yyyy-MM-dd HH:mm") + " UTC" : "—")</td>
+                    @{
+                        var canModify = !p.IsShared || User.IsInRole(DBMonitor.Models.Roles.Admin);
+                    }
                     <td class="text-end">
                         <a asp-controller="Schema" asp-action="Browse"  asp-route-profileId="@p.Id" class="btn btn-sm btn-success">Browse</a>
                         <a asp-controller="Sql"    asp-action="Editor"  asp-route-profileId="@p.Id" class="btn btn-sm btn-outline-success">SQL</a>
                         <a asp-controller="Import" asp-action="Start"   asp-route-profileId="@p.Id" class="btn btn-sm btn-outline-info">Import CSV</a>
                         <a asp-action="Details" asp-route-id="@p.Id" class="btn btn-sm btn-outline-secondary">Details</a>
-                        <a asp-action="Edit"    asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary">Edit</a>
-                        <a asp-action="Delete"  asp-route-id="@p.Id" class="btn btn-sm btn-outline-danger">Delete</a>
+                        @if (canModify)
+                        {
+                            <a asp-action="Edit"    asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a asp-action="Delete"  asp-route-id="@p.Id" class="btn btn-sm btn-outline-danger">Delete</a>
+                        }
                     </td>
                 </tr>
             }

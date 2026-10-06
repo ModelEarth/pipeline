@@ -29,7 +29,8 @@ public class HomeController : Controller
         {
             var userId = _userManager.GetUserId(User)!;
             var recent = await _db.ConnectionProfiles
-                .Where(p => (p.OwnerId == userId || p.IsShared) && p.LastUsedUtc != null)
+                .VisibleTo(userId, User)
+                .Where(p => p.LastUsedUtc != null)
                 .OrderByDescending(p => p.LastUsedUtc)
                 .Take(5)
                 .ToListAsync();

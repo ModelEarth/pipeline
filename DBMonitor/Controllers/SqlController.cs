@@ -50,7 +50,8 @@ public class SqlController : Controller
     {
         var userId = _userManager.GetUserId(User)!;
         var profile = await _db.ConnectionProfiles
-            .FirstOrDefaultAsync(p => p.Id == profileId && (p.OwnerId == userId || p.IsShared), ct);
+            .VisibleTo(userId, User)
+            .FirstOrDefaultAsync(p => p.Id == profileId, ct);
         if (profile is null) return NotFound();
 
         return View(new BrowseVm
@@ -76,7 +77,8 @@ public class SqlController : Controller
 
         var userId  = _userManager.GetUserId(User)!;
         var profile = await _db.ConnectionProfiles
-            .FirstOrDefaultAsync(p => p.Id == profileId && (p.OwnerId == userId || p.IsShared), ct);
+            .VisibleTo(userId, User)
+            .FirstOrDefaultAsync(p => p.Id == profileId, ct);
         if (profile is null) return NotFound();
 
         var plaintext = _protector.Unprotect(profile.EncryptedConnectionString);
@@ -183,7 +185,8 @@ public class SqlController : Controller
     {
         var userId  = _userManager.GetUserId(User)!;
         var profile = await _db.ConnectionProfiles
-            .FirstOrDefaultAsync(p => p.Id == profileId && (p.OwnerId == userId || p.IsShared), ct);
+            .VisibleTo(userId, User)
+            .FirstOrDefaultAsync(p => p.Id == profileId, ct);
         if (profile is null) return NotFound();
 
         var plaintext = _protector.Unprotect(profile.EncryptedConnectionString);
@@ -228,7 +231,8 @@ public class SqlController : Controller
     {
         var userId  = _userManager.GetUserId(User)!;
         var profile = await _db.ConnectionProfiles
-            .FirstOrDefaultAsync(p => p.Id == profileId && (p.OwnerId == userId || p.IsShared), ct);
+            .VisibleTo(userId, User)
+            .FirstOrDefaultAsync(p => p.Id == profileId, ct);
         if (profile is null) return NotFound();
 
         // Audit SQL: values are INTENTIONALLY REDACTED to avoid logging secrets (passwords, PII, etc.).

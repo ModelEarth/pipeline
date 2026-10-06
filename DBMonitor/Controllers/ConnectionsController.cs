@@ -35,7 +35,7 @@ public class ConnectionsController : Controller
     {
         var userId = _userManager.GetUserId(User)!;
         var profiles = await _db.ConnectionProfiles
-            .Where(p => p.OwnerId == userId || p.IsShared)
+            .VisibleTo(userId, User)
             .OrderByDescending(p => p.IsPinned)
             .ThenBy(p => p.SortOrder)
             .ThenBy(p => p.Name)
@@ -49,7 +49,7 @@ public class ConnectionsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> TogglePin(Guid id)
     {
-        var profile = await OwnedProfileAsync(id);
+        var profile = await VisibleProfileAsync(id);
         if (profile is null) return NotFound();
         profile.IsPinned = !profile.IsPinned;
         await _db.SaveChangesAsync();
@@ -66,7 +66,8 @@ public class ConnectionsController : Controller
         var userId = _userManager.GetUserId(User)!;
         var ids = items.Select(x => x.Id).ToHashSet();
         var profiles = await _db.ConnectionProfiles
-            .Where(p => (p.OwnerId == userId || p.IsShared) && ids.Contains(p.Id))
+            .VisibleTo(userId, User)
+            .Where(p => ids.Contains(p.Id))
             .ToListAsync();
         foreach (var p in profiles)
         {
@@ -81,7 +82,7 @@ public class ConnectionsController : Controller
 
     public async Task<IActionResult> Details(Guid id)
     {
-        var profile = await OwnedProfileAsync(id);
+        var profile = await VisibleProfileAsync(id);
         return profile is null ? NotFound() : View(profile);
     }
 
@@ -119,7 +120,7 @@ public class ConnectionsController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(Guid id)
     {
-        var profile = await OwnedProfileAsync(id);
+        var profile = await ModifiableProfileAsync(id);
         if (profile is null) return NotFound();
 
         ViewBag.ProfileId = id;
@@ -142,7 +143,7 @@ public class ConnectionsController : Controller
             return View(vm);
         }
 
-        var profile = await OwnedProfileAsync(id);
+        var profile = await ModifiableProfileAsync(id);
         if (profile is null) return NotFound();
 
         profile.Name = vm.Name.Trim();
@@ -160,7 +161,7 @@ public class ConnectionsController : Controller
     [HttpGet]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var profile = await OwnedProfileAsync(id);
+        var profile = await ModifiableProfileAsync(id);
         return profile is null ? NotFound() : View(profile);
     }
 
@@ -168,7 +169,7 @@ public class ConnectionsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var profile = await OwnedProfileAsync(id);
+        var profile = await ModifiableProfileAsync(id);
         if (profile is null) return NotFound();
 
         _db.ConnectionProfiles.Remove(profile);
@@ -182,7 +183,7 @@ public class ConnectionsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> TestSaved(Guid id, CancellationToken ct)
     {
-        var profile = await OwnedProfileAsync(id, ct);
+        var profile = await VisibleProfileAsync(id, ct);
         if (profile is null) return NotFound();
 
         var plaintext = _protector.Unprotect(profile.EncryptedConnectionString);
@@ -215,10 +216,21 @@ public class ConnectionsController : Controller
 
     // ── Helpers / Records ─────────────────────────────────────────────────────
 
-    private async Task<DbConnectionProfile?> OwnedProfileAsync(Guid id, CancellationToken ct = default)
+    // View / use (Browse, SQL, pin, test). Shared profiles require IndustryDbAccess or Admin.
+    private async Task<DbConnectionProfile?> VisibleProfileAsync(Guid id, CancellationToken ct = default)
     {
         var userId = _userManager.GetUserId(User)!;
         return await _db.ConnectionProfiles
-            .FirstOrDefaultAsync(p => p.Id == id && (p.OwnerId == userId || p.IsShared), ct);
+            .VisibleTo(userId, User)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
+    }
+
+    // Modify / delete. Shared profiles require Admin.
+    private async Task<DbConnectionProfile?> ModifiableProfileAsync(Guid id, CancellationToken ct = default)
+    {
+        var userId = _userManager.GetUserId(User)!;
+        return await _db.ConnectionProfiles
+            .ModifiableBy(userId, User)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
     }
 }

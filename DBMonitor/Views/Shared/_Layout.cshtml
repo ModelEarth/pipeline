@@ -41,6 +41,11 @@
                class="nav-pill @(controller == "Settings" ? "active" : "")">Settings</a>
             <a asp-area="" asp-controller="Help" asp-action="Quickstart"
                class="nav-pill @(controller == "Help" ? "active" : "")">Help</a>
+            @if (User.IsInRole(DBMonitor.Models.Roles.Admin))
+            {
+                <a asp-area="" asp-controller="Admin" asp-action="Users"
+                   class="nav-pill @(controller == "Admin" ? "active" : "")">Admin</a>
+            }
         }
     </nav>
 

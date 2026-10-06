@@ -156,6 +156,7 @@ builder.Services
         // Local users can currently sign in without confirming their email.
         options.SignIn.RequireConfirmedAccount = false;
     })
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services
@@ -245,9 +246,10 @@ builder.WebHost.ConfigureKestrel(options =>
 // All services must be registered before this line.
 var app = builder.Build();
 
-// ── Seed default connections ──────────────────────────────────────────────────
+// ── Seed default connections, roles, and admins ───────────────────────────────
 
 await SeedDefaultConnectionsAsync(app);
+await SeedRolesAndAdminsAsync(app);
 
 // ── HTTP request pipeline ─────────────────────────────────────────────────────
 
@@ -366,4 +368,44 @@ static async Task SeedDefaultConnectionsAsync(WebApplication app)
     }
 
     await db.SaveChangesAsync();
+}
+
+// ── Roles & admin seeder ──────────────────────────────────────────────────────
+//
+// Ensures the `Admin` and `IndustryDbAccess` roles exist, then promotes any
+// user whose email appears in the `ADMIN_EMAILS` config value (comma or
+// semicolon separated). Idempotent on every startup. Silently skips emails
+// that don't match a registered user — they'll be promoted once they
+// register.
+static async Task SeedRolesAndAdminsAsync(WebApplication app)
+{
+    await using var scope = app.Services.CreateAsyncScope();
+
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+
+    foreach (var role in new[] { Roles.Admin, Roles.IndustryDbAccess })
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+            await roleManager.CreateAsync(new IdentityRole(role));
+    }
+
+    var raw = app.Configuration["ADMIN_EMAILS"];
+    if (string.IsNullOrWhiteSpace(raw)) return;
+
+    var emails = raw.Split(
+        new[] { ',', ';' },
+        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    foreach (var email in emails)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is null) continue;
+
+        if (!await userManager.IsInRoleAsync(user, Roles.Admin))
+            await userManager.AddToRoleAsync(user, Roles.Admin);
+
+        if (!await userManager.IsInRoleAsync(user, Roles.IndustryDbAccess))
+            await userManager.AddToRoleAsync(user, Roles.IndustryDbAccess);
+    }
 }

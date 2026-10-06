@@ -237,7 +237,8 @@ public class SchemaController : Controller
     {
         var userId = _userManager.GetUserId(User)!;
         return await _db.ConnectionProfiles
-            .FirstOrDefaultAsync(p => p.Id == profileId && (p.OwnerId == userId || p.IsShared), ct);
+            .VisibleTo(userId, User)
+            .FirstOrDefaultAsync(p => p.Id == profileId, ct);
     }
 
     private async Task<(DbConnectionProfile profile, DbConnection conn)?> OpenForCurrentUserAsync(

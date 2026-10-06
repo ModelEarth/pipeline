@@ -28,7 +28,8 @@ public class SearchController : Controller
         var term   = q.Trim();
 
         var profiles = await _db.ConnectionProfiles
-            .Where(p => (p.OwnerId == userId || p.IsShared) && p.Name.Contains(term))
+            .VisibleTo(userId, User)
+            .Where(p => p.Name.Contains(term))
             .OrderBy(p => p.Name)
             .Take(20)
             .Select(p => new SearchHit(p.Id.ToString(), p.Name, "Connection", null,

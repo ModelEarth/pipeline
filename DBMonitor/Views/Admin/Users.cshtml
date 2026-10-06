@@ -1,0 +1,82 @@
+@model IEnumerable<DBMonitor.Models.ViewModels.AdminUserVm>
+@{
+    ViewData["Title"] = "Admin — Users";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Users</h2>
+    <span class="text-muted small">@Model.Count() total</span>
+</div>
+
+@if (TempData["AdminError"] is string err)
+{
+    <div class="alert alert-danger py-2 small">@err</div>
+}
+
+<table class="table table-hover align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>Email</th>
+            <th style="width:160px">IndustryDB Access</th>
+            <th style="width:140px">Admin</th>
+            <th style="width:260px" class="text-end">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var u in Model)
+        {
+            <tr>
+                <td class="fw-semibold">
+                    @u.Email
+                    @if (u.IsSelf)
+                    {
+                        <span class="badge bg-info text-dark ms-1">you</span>
+                    }
+                </td>
+                <td>
+                    @if (u.IsAdmin)
+                    {
+                        <span class="badge bg-success">granted (admin)</span>
+                    }
+                    else if (u.HasIndustryDbAccess)
+                    {
+                        <span class="badge bg-success">granted</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">none</span>
+                    }
+                </td>
+                <td>
+                    @if (u.IsAdmin)
+                    {
+                        <span class="badge bg-primary">admin</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">user</span>
+                    }
+                </td>
+                <td class="text-end">
+                    @if (!u.IsAdmin)
+                    {
+                        <form asp-action="ToggleIndustryAccess" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@u.Id" />
+                            <button type="submit" class="btn btn-sm @(u.HasIndustryDbAccess ? "btn-outline-warning" : "btn-outline-success")">
+                                @(u.HasIndustryDbAccess ? "Revoke access" : "Grant access")
+                            </button>
+                        </form>
+                    }
+                    <form asp-action="ToggleAdmin" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@u.Id" />
+                        <button type="submit" class="btn btn-sm @(u.IsAdmin ? "btn-outline-danger" : "btn-outline-primary")">
+                            @(u.IsAdmin ? "Demote" : "Make admin")
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
